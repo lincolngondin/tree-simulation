@@ -6,19 +6,116 @@ class Node {
         this.pointers = [];
         // Se o no atual é uma folha
         this.isLeaf = false;
+        // Se o no atual é a raiz
+        this.isRoot = false;
     }
 }
 
 export class BPlusTree {
     constructor(fanout, animate = false, animationSpeed = 500) {
         this.fanout = fanout;
-        this.minkeys = Math.ceil(this.fanout / 2) - 1
-        this.maxkeys = this.fanout - 1
+        // folhas devem ter pelo menos ceil((n-1)/2) valores ate n-1 valores
+        this.minKeys = Math.ceil((this.fanout - 1) / 2)
+        this.maxKeys = this.fanout - 1
+
+        // nos não folhas(ou nos internos) devem ter pelo menos ceil(n/2) -1 valores até n-1 valores
+        this.minNonLeafPointersKeys = Math.ceil(this.fanout / 2) - 1;
+        this.maxNonLeafPointersKeys = this.fanout - 1;
+
         this.animationSpeed = 500; // Velocidade da animação em ms
         this.root = null;
         this.animate = animate;
         this.animationSpeed = animationSpeed;
         this.treeDraw = null;
+    }
+
+    async insert(key) {
+        // Criar raiz se não existir
+        if (this.root == null) {
+            this.root = new Node();
+            this.root.isLeaf = true;
+            this.root.searchKeys = [key];
+            this.root.pointers = [null, null]; // Ponteiro esquerdo e direito para navegação sequencial
+            return;
+        }
+
+        // encontra o no de folha L que deve conter K
+        const path = this.getPathToLeaf(key);
+        const leaf = path[path.length - 1]
+
+        if (this.animate && this.treeDraw) {
+            let steps = path.map(node => ({ highlights: new Set([node]) }));
+            steps.push({ highlights: new Set([leaf]), delay: this.animationSpeed * 2 });
+            await this.treeDraw.animate(steps);
+        }
+
+        this.insertInLeaf(leaf, key);
+
+        if (leaf.searchKeys.length > this.maxKeys) {
+            let mid = Math.floor(leaf.searchKeys.length / 2);
+            let L_ = new Node();
+            L_.isLeaf = true;
+            L_.searchKeys = leaf.searchKeys.splice(mid);
+            L_.pointers = leaf.pointers.splice(mid);
+            leaf.pointers.push(L_);
+            this.insertInParent(leaf, L_.searchKeys[0], L_);
+        }
+
+        this.treeDraw?.addInfo(`INSERÇÃO: Valor ${key} adicionado!`, "SUCCESS");
+    }
+
+    insertInLeaf(node, key) {
+        let pos = 0;
+        for (let i = 0; i < node.searchKeys.length; i++) {
+            if (key <= node.searchKeys[i]) {
+                pos = i;
+                break;
+            }
+            pos = i + 1;
+        }
+        node.searchKeys.splice(pos, 0, key);
+        node.pointers.splice(pos, 0, null);
+    }
+
+    insertInParent(node, keyLine, nodeLine) {
+        if (node === this.root) {
+            let newRoot = new Node();
+            newRoot.isLeaf = false;
+            newRoot.searchKeys = [keyLine];
+            newRoot.pointers = [node, nodeLine];
+            this.root = newRoot;
+            return;
+        }
+
+        let parent = this._findParent(this.root, node);
+
+        if (parent == null) {
+            // shouldn't happen
+            return;
+        }
+
+        let pos = 0;
+        for (let i = 0; i < parent.searchKeys.length; i++) {
+            if (keyLine < parent.searchKeys[i]) {
+                pos = i;
+                break;
+            }
+            pos = i + 1;
+        }
+
+        parent.searchKeys.splice(pos, 0, keyLine);
+        parent.pointers.splice(pos + 1, 0, nodeLine);
+
+        if (parent.searchKeys.length > this.maxKeys) {
+            let mid = Math.floor(this.maxKeys / 2);
+            let P_ = new Node();
+            P_.isLeaf = false;
+            let promoted = parent.searchKeys[mid];
+            P_.searchKeys = parent.searchKeys.splice(mid + 1);
+            P_.pointers = parent.pointers.splice(mid + 1);
+            parent.searchKeys.pop();
+            this.insertInParent(parent, promoted, P_);
+        }
     }
 
     setTreeDraw(treeDraw) {
@@ -108,44 +205,6 @@ export class BPlusTree {
         }
         return allKeys;
     }
-    async insert(key) {
-        // Criar raiz se não existir
-        if (this.root == null) {
-            this.root = new Node();
-            this.root.isLeaf = true;
-            this.root.searchKeys = [key];
-            this.root.pointers = [null, null]; // Ponteiro esquerdo e direito para navegação sequencial
-            return;
-        }
-
-        // Encontrar nó folha onde inserir
-        let path = this.getPathToLeaf(key);
-        let leaf = path[path.length - 1];
-
-        if (this.animate && this.treeDraw) {
-            let steps = path.map(node => ({ highlights: new Set([node]) }));
-            steps.push({ highlights: new Set([leaf]), delay: this.animationSpeed * 2 });
-            await this.treeDraw.animate(steps);
-        }
-
-        // Inserir chave mantendo ordem permitindo valores iguais
-        let insertPos = 0;
-        for (let i = 0; i < leaf.searchKeys.length; i++) {
-            if (key <= leaf.searchKeys[i]) {
-                insertPos = i;
-                break;
-            }
-            insertPos = i + 1;
-        }
-
-        leaf.searchKeys.splice(insertPos, 0, key);
-        leaf.pointers.splice(insertPos, 0, null); // Inserir ponteiro nulo na posição correspondente
-        // Se nó folha transbordou, fazer split
-        if (leaf.searchKeys.length > this.maxkeys) {
-            this._splitLeaf(leaf);
-        }
-        this.treeDraw?.addInfo(`INSERÇÃO: Valor ${key} adicionado!`, "SUCCESS");
-    }
 
     async delete(key) {
         if (this.root === null) return;
@@ -184,8 +243,8 @@ export class BPlusTree {
             this._updateSeparator(leaf, leaf.searchKeys[0]);
         }
 
-        // Se nó folha ficou com menos de minkeys, fazer merge/borrow
-        if (leaf.searchKeys.length < this.minkeys && leaf !== this.root) {
+        // Se nó folha ficou com menos de minKeys, fazer merge/borrow
+        if (leaf.searchKeys.length < this.minKeys && leaf !== this.root) {
             this._rebalanceLeaf(leaf);
         }
 
@@ -212,85 +271,6 @@ export class BPlusTree {
         return current;
     }
 
-    _splitLeaf(leaf) {
-        let mid = Math.floor(this.maxkeys / 2);
-        let newLeaf = new Node();
-        newLeaf.isLeaf = true;
-
-        // Dividir chaves
-        newLeaf.searchKeys = leaf.searchKeys.splice(mid);
-        newLeaf.pointers = leaf.pointers.splice(mid);
-
-        // Ajustar ponteiros de navegação sequencial
-        leaf.pointers.push(newLeaf);
-
-        // Se raiz, criar nova raiz
-        if (leaf === this.root) {
-            let newRoot = new Node();
-            newRoot.isLeaf = false;
-            newRoot.searchKeys = [newLeaf.searchKeys[0]];
-            newRoot.pointers = [leaf, newLeaf];
-            this.root = newRoot;
-        } else {
-            // Propagar split para cima
-            this._insertNonLeaf(newLeaf.searchKeys[0], leaf, newLeaf);
-        }
-    }
-
-    _insertNonLeaf(key, leftChild, rightChild) {
-        let parent = this._findParent(this.root, leftChild);
-
-        if (parent == null) {
-            // Criar nova raiz
-            let newRoot = new Node();
-            newRoot.isLeaf = false;
-            newRoot.searchKeys = [key];
-            newRoot.pointers = [leftChild, rightChild];
-            this.root = newRoot;
-            return;
-        }
-
-        // Encontrar posição de inserção
-        let i = 0;
-        for (i = 0; i < parent.searchKeys.length; i++) {
-            if (key < parent.searchKeys[i]) {
-                break;
-            }
-        }
-
-        parent.searchKeys.splice(i, 0, key);
-        parent.pointers.splice(i + 1, 0, rightChild);
-
-        // Se transbordou, fazer split do nó interno
-        if (parent.searchKeys.length > this.maxkeys) {
-            this._splitInternal(parent);
-        }
-    }
-
-    _splitInternal(node) {
-        let mid = Math.floor(this.maxkeys / 2);
-        let newNode = new Node();
-        newNode.isLeaf = false;
-
-        // Chave promovida
-        let promotedKey = node.searchKeys[mid];
-
-        newNode.searchKeys = node.searchKeys.splice(mid + 1);
-        newNode.pointers = node.pointers.splice(mid + 1);
-        node.searchKeys.pop(); // Remove chave promovida
-
-        if (node === this.root) {
-            let newRoot = new Node();
-            newRoot.isLeaf = false;
-            newRoot.searchKeys = [promotedKey];
-            newRoot.pointers = [node, newNode];
-            this.root = newRoot;
-        } else {
-            let parent = this._findParent(this.root, node);
-            this._insertNonLeaf(promotedKey, node, newNode);
-        }
-    }
-
     _findParent(node, child) {
         if (node.isLeaf) return null;
 
@@ -315,7 +295,7 @@ export class BPlusTree {
         // Tentar pegar emprestado do irmão direito
         if (leafIndex < parent.pointers.length - 1) {
             let rightSibling = parent.pointers[leafIndex + 1];
-            if (rightSibling.searchKeys.length > this.minkeys) {
+            if (rightSibling.searchKeys.length > this.minKeys) {
                 // Mover primeira chave do irmão direito para o final da folha atual
                 leaf.searchKeys.push(rightSibling.searchKeys.shift());
                 leaf.pointers.splice(leaf.pointers.length - 1, 0, rightSibling.pointers.shift());
@@ -329,7 +309,7 @@ export class BPlusTree {
         // Tentar pegar emprestado do irmão esquerdo
         if (leafIndex > 0) {
             let leftSibling = parent.pointers[leafIndex - 1];
-            if (leftSibling.searchKeys.length > this.minkeys) {
+            if (leftSibling.searchKeys.length > this.minKeys) {
                 // Mover última chave do irmão esquerdo para o início da folha atual
                 leaf.searchKeys.unshift(leftSibling.searchKeys.pop());
                 leaf.pointers.unshift(leftSibling.pointers.pop());
@@ -364,7 +344,7 @@ export class BPlusTree {
         }
 
         // Se pai ficou desequilibrado
-        if (parent.searchKeys.length < this.minkeys && parent !== this.root) {
+        if (parent.searchKeys.length < this.minKeys && parent !== this.root) {
             this._rebalanceLeaf(parent);
         }
     }

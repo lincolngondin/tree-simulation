@@ -9,7 +9,7 @@ const configs = new VisualizationConfigs()
 
 let animate = true
 let animationSpeed = 500
-let actualFanout = 5;
+let actualFanout = 4;
 
 let t = new BPlusTree(actualFanout, animate, animationSpeed)
 // let t = new BTree(3, animate, animationSpeed)

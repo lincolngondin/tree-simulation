@@ -12,8 +12,8 @@ class Node {
 export class BTree {
     constructor(fanout, animate = false, animationSpeed = 500) {
         this.fanout = fanout;
-        this.minkeys = Math.ceil(this.fanout / 2) - 1;
-        this.maxkeys = this.fanout - 1;
+        this.minKeys = Math.ceil(this.fanout / 2) - 1;
+        this.maxKeys = this.fanout - 1;
         this.root = null;
         this.animate = animate;
         this.animationSpeed = animationSpeed;
@@ -88,7 +88,7 @@ export class BTree {
         }
 
         // Se raiz cheia, dividir antes de inserir
-        if (this.root.searchKeys.length === this.maxkeys) {
+        if (this.root.searchKeys.length === this.maxKeys) {
             let newRoot = new Node();
             newRoot.isLeaf = false;
             newRoot.pointers = [this.root];
@@ -117,7 +117,7 @@ export class BTree {
             i++;
 
             // Se filho cheio, dividir
-            if (node.pointers[i].searchKeys.length === this.maxkeys) {
+            if (node.pointers[i].searchKeys.length === this.maxKeys) {
                 this._splitChild(node, i);
                 if (key > node.searchKeys[i]) {
                     i++;
@@ -133,7 +133,7 @@ export class BTree {
         let z = new Node();
         z.isLeaf = y.isLeaf;
 
-        let mid = Math.floor(this.maxkeys / 2);
+        let mid = Math.floor(this.maxKeys / 2);
         let promotedKey = y.searchKeys[mid];
 
         // Mover chaves para o novo nó
@@ -193,7 +193,7 @@ export class BTree {
 
         // Chave deve estar no filho
         let child = node.pointers[i];
-        if (child.searchKeys.length === this.minkeys) {
+        if (child.searchKeys.length === this.minKeys) {
             this._fillChild(node, i);
             // Após preencher, o filho pode ter mudado
             child = node.pointers[i];
@@ -205,12 +205,12 @@ export class BTree {
     _deleteInternalNode(node, i) {
         let k = node.searchKeys[i];
 
-        if (node.pointers[i].searchKeys.length > this.minkeys) {
+        if (node.pointers[i].searchKeys.length > this.minKeys) {
             // Substituir por predecessor
             let pred = this._getPredecessor(node.pointers[i]);
             node.searchKeys[i] = pred;
             this._delete(node.pointers[i], pred);
-        } else if (node.pointers[i + 1].searchKeys.length > this.minkeys) {
+        } else if (node.pointers[i + 1].searchKeys.length > this.minKeys) {
             // Substituir por sucessor
             let succ = this._getSuccessor(node.pointers[i + 1]);
             node.searchKeys[i] = succ;
@@ -237,10 +237,10 @@ export class BTree {
     }
 
     _fillChild(node, i) {
-        if (i > 0 && node.pointers[i - 1].searchKeys.length > this.minkeys) {
+        if (i > 0 && node.pointers[i - 1].searchKeys.length > this.minKeys) {
             // Pegar emprestado do irmão esquerdo
             this._borrowFromLeft(node, i);
-        } else if (i < node.pointers.length - 1 && node.pointers[i + 1].searchKeys.length > this.minkeys) {
+        } else if (i < node.pointers.length - 1 && node.pointers[i + 1].searchKeys.length > this.minKeys) {
             // Pegar emprestado do irmão direito
             this._borrowFromRight(node, i);
         } else {
