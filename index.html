@@ -1,29 +1,59 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="pt-BR">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
+    <title>Visualização de Árvore B e B+</title>
     <link rel="stylesheet" href="./styles.css">
 </head>
 
 <body>
-    <div class="inputs">
-        <div>
-            <input type="text" name="value" class="input" id="value">
-            <input type="button" class="btn" value="Adicionar" id="adicionar">
-            <input type="button" class="btn" value="Remover" id="remover">
-            <input type="button" class="btn" value="Buscar" id="buscar">
-        </div>
-        <div>
-            <input type="text" name="fanoutValue" class="input" id="fanoutValue">
-            <input type="button" class="btn" value="Mudar Fanout" id="fanout">
-        </div>
-    </div>
-    <div class="canvasContainer">
-        <canvas id="canvas"></canvas>
-    </div>
+    <header>
+        <h1>Simulação do funcionamento de árvores B e B+</h1>
+    </header>
+    <main>
+        <section class="controls">
+            <div class="control-group">
+                <h2>Operações Básicas</h2>
+                <div class="input-row">
+                    <input type="text" name="value" class="input" id="value" placeholder="Valor">
+                    <button class="btn" id="adicionar">Adicionar</button>
+                    <button class="btn" id="remover">Remover</button>
+                    <button class="btn" id="buscar">Buscar</button>
+                </div>
+            </div>
+            <div class="control-group">
+                <h2>Inclusão e Remoção aleatória</h2>
+                <div class="input-row">
+                    <input type="text" name="valueInf" class="input" id="aleatorioInf" placeholder="Mínimo">
+                    <input type="text" name="valueSup" class="input" id="aleatorioSup" placeholder="Máximo">
+                    <input type="text" name="valueQuantity" class="input" id="quantidade" placeholder="Quantidade">
+                    <button class="btn" id="gerarAleatorio">Gerar</button>
+                </div>
+                <div class="input-row">
+                    <input type="text" name="valueQuantityRemove" class="input" id="quantidadeARemover"
+                        placeholder="Quantidade">
+                    <button class="btn" id="removerAleatorio">Remover</button>
+                </div>
+            </div>
+            <div class="control-group">
+                <h2>Configurações</h2>
+                <div class="input-row">
+                    <input type="text" name="fanoutValue" class="input" id="fanoutValue" placeholder="Fanout">
+                    <button class="btn" id="fanout">Mudar Fanout</button>
+                </div>
+                <div class="input-row">
+                    <label for="speed">Velocidade:</label>
+                    <input type="range" id="speed" min="100" max="2000" value="500" step="100">
+                    <span id="speedValue">500ms</span>
+                </div>
+            </div>
+        </section>
+        <section class="canvasContainer">
+            <canvas id="canvas"></canvas>
+        </section>
+    </main>
     <script type="module" src="src/main.js"></script>
 </body>
 

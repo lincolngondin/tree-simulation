@@ -42,9 +42,9 @@ export class CanvasRenderer {
         this.ctx.fillStyle = "white";
         this.ctx.fillRect(0, 0, this.cssWidth, this.cssHeight);
     }
-    drawRectangle(x, y, width, height) {
+    drawRectangle(x, y, width, height, highlighted = false) {
         // Desenhar retângulo preenchido
-        this.ctx.fillStyle = "#c8ebfb";
+        this.ctx.fillStyle = highlighted ? "#ffeb3b" : "#c8ebfb";
         this.ctx.fillRect(x, y, width, height);
 
         // Desenhar borda com linha mais fina para nitidez
@@ -52,22 +52,22 @@ export class CanvasRenderer {
         this.ctx.lineWidth = 1;
         this.ctx.strokeRect(x, y, width, height);
     }
-    drawRectangleWithText(x, y, width, height, text) {
+    drawRectangleWithText(x, y, width, height, text, highlighted = false) {
         // Definir fonte com tamanho apropriado baseado na altura
         const fontSize = Math.min(height * 0.6, width * 0.3);
-        this.ctx.font = `${Math.floor(fontSize)}px Arial`;
+        this.ctx.font = `bold ${Math.floor(fontSize)}px Arial`;
 
         // Medir largura do texto
         const textWidth = this.ctx.measureText(text).width;
 
         // Se texto for muito largo, reduzir fonte ou truncar
-        if (textWidth > width - 8) {
-            const newFontSize = Math.floor(fontSize * (width - 8) / textWidth);
-            this.ctx.font = `${newFontSize}px Arial`;
+        if (textWidth > width - 4) {
+            const newFontSize = Math.floor(fontSize * (width - 4) / textWidth);
+            this.ctx.font = `bold ${newFontSize}px Arial`;
         }
 
         // Desenhar retângulo de fundo
-        this.ctx.fillStyle = "#c8ebfb";
+        this.ctx.fillStyle = highlighted ? "#ffeb3b" : "#c8ebfb";
         this.ctx.fillRect(x, y, width, height);
 
         // Desenhar borda
@@ -123,6 +123,13 @@ export class CanvasRenderer {
         this.ctx.restore();
     }
 
+    drawText(text, x, y, size, fontFamily, color) {
+        this.ctx.fillStyle = color;
+        this.ctx.font = `${size}px ${fontFamily}`;
+        const textMetrics = this.ctx.measureText(text)
+        this.ctx.fillText(text, x + (textMetrics.width / 2), y);
+    }
+
     // Método para redimensionar o canvas
     resize(newWidth, newHeight) {
         const canvas = this.ctx.canvas;
@@ -149,14 +156,4 @@ export class CanvasRenderer {
         this.ctx.textBaseline = "top";
     }
 
-    // Método para obter informações do canvas
-    getInfo() {
-        return {
-            cssWidth: this.cssWidth,
-            cssHeight: this.cssHeight,
-            internalWidth: this.width,
-            internalHeight: this.height,
-            devicePixelRatio: this.dpr
-        };
-    }
 }

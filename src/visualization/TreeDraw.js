@@ -1,16 +1,44 @@
+class Message {
+    constructor(message, kind) {
+        this.defaultMessageTime = 5000;
+        this.messageTime = 0;
+        this.message = message;
+        this.creationTime = Date.now()
+        this.kind = kind;
+    }
+}
+
 export class TreeDraw {
-    constructor(tree, canvasRender) {
+    constructor(tree, canvasRender, configs) {
         this.tree = tree;
         this.render = canvasRender;
 
         // Parâmetros configuráveis com valores padrão
-        this.nodeWidth = 60;           // Largura de cada chave
-        this.nodePointerWidth = 15; // Largura de cada ponteiro
-        this.nodeHeight = 35;         // Altura dos nós
-        this.horizontalSpacing = 170; // Espaçamento horizontal entre nós
-        this.verticalSpacing = 120;     // Espaçamento vertical entre níveis
-        this.canvasPadding = 50;   // Padding das bordas do canvas
-        this.minNodeSpacing = 20; // Espaçamento mínimo entre nós
+        this.configs = configs;
+        this.highlights = new Set(); // Nós destacados
+        this.infos = new Array();
+        this.maxInfos = 5;
+    }
+
+    drawInfo() {
+        // desenha todas as operacoes executadas na arvore
+        for (let i = 0; i < this.infos.length; i++) {
+            let messageColor = "blue";
+            if (this.infos[i].kind == "SUCCESS") {
+                messageColor = "blue";
+            }
+            else if (this.infos[i].kind == "ERROR") {
+                messageColor = "red";
+            }
+
+            this.render.drawText(this.infos[i].message, 10, 20 + i * 20, 16, "Monospace", messageColor)
+        }
+    }
+    addInfo(message, kind) {
+        if (this.infos.length >= this.maxInfos) {
+            this.infos.shift();
+        }
+        this.infos.push(new Message(message, kind))
     }
 
     drawTree() {
@@ -21,6 +49,7 @@ export class TreeDraw {
 
         // Limpar canvas
         this.render.clearWindow();
+        this.drawInfo()
 
         // Calcular posições dos nós começando do centro superior do canvas
         const positions = new Map();
@@ -48,13 +77,13 @@ export class TreeDraw {
         const x = centerX - nodeWidth / 2;
 
         // Posição Y: baseada no nível
-        const y = level * this.verticalSpacing + this.canvasPadding;
+        const y = level * this.configs.verticalSpacing + this.configs.canvasPadding;
 
         positions.set(node, { x, y });
 
         // Processar filhos
         if (!node.isLeaf && node.pointers.length > 0) {
-            const childY = y + this.nodeHeight + 20; // Espaço para as arestas
+            const childY = y + this.configs.nodeHeight + 20; // Espaço para as arestas
             let childOffset = centerX - subtreeWidth / 2;
 
             for (let i = 0; i < node.pointers.length; i++) {
@@ -63,7 +92,7 @@ export class TreeDraw {
                 const childCenterX = childOffset + childSubtreeWidth / 2;
 
                 this._calculatePositions(childNode, level + 1, childCenterX, positions);
-                childOffset += childSubtreeWidth + this.minNodeSpacing;
+                childOffset += childSubtreeWidth + this.configs.minNodeSpacing;
             }
         }
     }
@@ -81,7 +110,7 @@ export class TreeDraw {
             const childWidth = this._getSubtreeWidthPixels(node.pointers[i]);
             totalWidth += childWidth;
             if (i < node.pointers.length - 1) {
-                totalWidth += this.minNodeSpacing;
+                totalWidth += this.configs.minNodeSpacing;
             }
         }
 
@@ -94,7 +123,7 @@ export class TreeDraw {
     _getNodeWidth(node) {
         if (node == null) return 0;
         // Largura = (número de pointers * largura_pointer) + (número de chaves * largura_chave)
-        return node.pointers.length * this.nodePointerWidth + node.searchkeys.length * this.nodeWidth;
+        return node.pointers.length * this.configs.nodePointerWidth + node.searchKeys.length * this.configs.nodeWidth;
     }
 
     _getSubtreeWidth(node) {
@@ -125,15 +154,15 @@ export class TreeDraw {
             if (childPos) {
                 // Calcular posição X do ponteiro i no nó pai
                 // Layout: P0 | K0 | P1 | K1 | ... | Pk
-                const pointerX = parentPos.x + i * (this.nodePointerWidth + this.nodeWidth) + this.nodePointerWidth / 2;
+                const pointerX = parentPos.x + i * (this.configs.nodePointerWidth + this.configs.nodeWidth) + this.configs.nodePointerWidth / 2;
 
                 // Calcular posição X do centro do primeiro ponteiro no nó filho
-                const childPointerX = childPos.x + this.nodePointerWidth / 2;
+                const childPointerX = childPos.x + this.configs.nodePointerWidth / 2;
 
                 // Linha do ponteiro do pai para o centro do primeiro ponteiro do filho
                 this.render.drawLine(
                     pointerX,
-                    parentPos.y + this.nodeHeight,
+                    parentPos.y + this.configs.nodeHeight,
                     childPointerX,
                     childPos.y,
                     2,
@@ -153,20 +182,21 @@ export class TreeDraw {
         if (!pos) return;
 
         // Calcular largura total do nó para centralizar
-        const totalWidth = node.pointers.length * this.nodePointerWidth + node.searchkeys.length * this.nodeWidth;
+        const totalWidth = node.pointers.length * this.configs.nodePointerWidth + node.searchKeys.length * this.configs.nodeWidth;
         const startX = pos.x; // pos.x já está centralizado pela _calculatePositions
 
         let currentX = startX;
 
         for (let i = 0; i < node.pointers.length; i++) {
             // Desenhar pointer
-            this.render.drawRectangle(currentX, pos.y, this.nodePointerWidth, this.nodeHeight);
-            currentX += this.nodePointerWidth;
+            const isHighlighted = this.highlights.has(node);
+            this.render.drawRectangle(currentX, pos.y, this.configs.nodePointerWidth, this.configs.nodeHeight, isHighlighted);
+            currentX += this.configs.nodePointerWidth;
 
             // Desenhar chave (se existir para este índice)
-            if (i < node.searchkeys.length) {
-                this.render.drawRectangleWithText(currentX, pos.y, this.nodeWidth, this.nodeHeight, node.searchkeys[i].toString());
-                currentX += this.nodeWidth;
+            if (i < node.searchKeys.length) {
+                this.render.drawRectangleWithText(currentX, pos.y, this.configs.nodeWidth, this.configs.nodeHeight, node.searchKeys[i].toString(), isHighlighted);
+                currentX += this.configs.nodeWidth;
             }
         }
 
@@ -176,6 +206,26 @@ export class TreeDraw {
                 this._drawNodes(child, positions);
             });
         }
+    }
+
+    // Método para animar passos
+    animate(steps) {
+        return new Promise(resolve => {
+            let i = 0;
+            const next = () => {
+                if (i < steps.length) {
+                    this.highlights = steps[i].highlights || new Set();
+                    this.drawTree();
+                    setTimeout(next, steps[i].delay || this.configs.animationSpeed);
+                    i++;
+                } else {
+                    this.highlights.clear();
+                    this.drawTree();
+                    resolve();
+                }
+            };
+            next();
+        });
     }
 
 }
