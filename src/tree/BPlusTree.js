@@ -117,7 +117,129 @@ export class BPlusTree {
             this.insertInParent(parent, promoted, P_);
         }
     }
+    async delete(key) {
+        if (!this.root) return;
 
+        let path = this.getPathToLeaf(key);
+        let leaf = path[path.length - 1];
+
+        if (this.animate && this.treeDraw) {
+            let steps = path.map(node => ({ highlights: new Set([node]) }));
+            steps.push({ highlights: new Set([leaf]), delay: this.animationSpeed * 2 });
+            await this.treeDraw.animate(steps);
+        }
+
+        let found = false;
+        let index = -1;
+        for (let i = 0; i < leaf.searchKeys.length; i++) {
+            if (leaf.searchKeys[i] === key) {
+                found = true;
+                index = i;
+                break;
+            }
+        }
+        if (!found) {
+            this.treeDraw?.addInfo(`REMOÇÃO: Valor ${key} não encontrado!`, "ERROR");
+            return;
+        }
+
+        leaf.searchKeys.splice(index, 1);
+        leaf.pointers.splice(index, 1);
+
+        this.treeDraw?.addInfo(`REMOÇÃO: Valor ${key} removido!`, "SUCCESS");
+
+        if (leaf.searchKeys.length >= this.minKeys || leaf === this.root) return;
+
+        // rebalance leaf
+        let parent = path.length > 1 ? path[path.length - 2] : null;
+        if (!parent) return;
+
+        let leafIndex = parent.pointers.indexOf(leaf);
+        let leftSibling = leafIndex > 0 ? parent.pointers[leafIndex - 1] : null;
+        let rightSibling = leafIndex < parent.pointers.length - 1 ? parent.pointers[leafIndex + 1] : null;
+
+        // try borrow from left
+        if (leftSibling && leftSibling.searchKeys.length > this.minKeys) {
+            leaf.searchKeys.unshift(leftSibling.searchKeys.pop());
+            leaf.pointers.unshift(leftSibling.pointers.pop());
+            parent.searchKeys[leafIndex - 1] = leaf.searchKeys[0];
+            return;
+        }
+
+        // try borrow from right
+        if (rightSibling && rightSibling.searchKeys.length > this.minKeys) {
+            leaf.searchKeys.push(rightSibling.searchKeys.shift());
+            leaf.pointers.splice(leaf.pointers.length - 1, 0, rightSibling.pointers.shift());
+            parent.searchKeys[leafIndex] = rightSibling.searchKeys[0] || leaf.searchKeys[0];
+            return;
+        }
+
+        // merge
+        if (leftSibling) {
+            leftSibling.searchKeys = leftSibling.searchKeys.concat(leaf.searchKeys);
+            leftSibling.pointers = leftSibling.pointers.slice(0, -1).concat(leaf.pointers.slice(1));
+            parent.searchKeys.splice(leafIndex - 1, 1);
+            parent.pointers.splice(leafIndex, 1);
+        } else if (rightSibling) {
+            leaf.searchKeys = leaf.searchKeys.concat(rightSibling.searchKeys);
+            leaf.pointers = leaf.pointers.slice(0, -1).concat(rightSibling.pointers.slice(1));
+            parent.searchKeys.splice(leafIndex, 1);
+            parent.pointers.splice(leafIndex + 1, 1);
+        }
+
+        // if parent underflows
+        if (parent.searchKeys.length < this.minNonLeafPointersKeys && parent !== this.root) {
+            this.delete_entry(parent);
+        }
+
+        // if root empty
+        if (this.root.searchKeys.length === 0 && this.root.pointers.length > 0) {
+            this.root = this.root.pointers[0];
+        }
+    }
+
+    delete_entry(node) {
+        let parent = this._findParent(this.root, node);
+        if (!parent) return;
+
+        let nodeIndex = parent.pointers.indexOf(node);
+        let leftSibling = nodeIndex > 0 ? parent.pointers[nodeIndex - 1] : null;
+        let rightSibling = nodeIndex < parent.pointers.length - 1 ? parent.pointers[nodeIndex + 1] : null;
+
+        // try borrow from left
+        if (leftSibling && leftSibling.searchKeys.length > this.minNonLeafPointersKeys) {
+            node.searchKeys.unshift(parent.searchKeys[nodeIndex - 1]);
+            node.pointers.unshift(leftSibling.pointers.pop());
+            parent.searchKeys[nodeIndex - 1] = leftSibling.searchKeys.pop();
+            return;
+        }
+
+        // try borrow from right
+        if (rightSibling && rightSibling.searchKeys.length > this.minNonLeafPointersKeys) {
+            node.searchKeys.push(parent.searchKeys[nodeIndex]);
+            node.pointers.push(rightSibling.pointers.shift());
+            parent.searchKeys[nodeIndex] = rightSibling.searchKeys.shift();
+            return;
+        }
+
+        // merge
+        if (leftSibling) {
+            leftSibling.searchKeys = leftSibling.searchKeys.concat([parent.searchKeys[nodeIndex - 1]], node.searchKeys);
+            leftSibling.pointers = leftSibling.pointers.concat(node.pointers);
+            parent.searchKeys.splice(nodeIndex - 1, 1);
+            parent.pointers.splice(nodeIndex, 1);
+        } else if (rightSibling) {
+            node.searchKeys = node.searchKeys.concat([parent.searchKeys[nodeIndex]], rightSibling.searchKeys);
+            node.pointers = node.pointers.concat(rightSibling.pointers);
+            parent.searchKeys.splice(nodeIndex, 1);
+            parent.pointers.splice(nodeIndex + 1, 1);
+        }
+
+        // if parent underflows
+        if (parent.searchKeys.length < this.minNonLeafPointersKeys && parent !== this.root) {
+            this.delete_entry(parent);
+        }
+    }
     setTreeDraw(treeDraw) {
         this.treeDraw = treeDraw;
     }
@@ -206,71 +328,6 @@ export class BPlusTree {
         return allKeys;
     }
 
-    async delete(key) {
-        if (this.root === null) return;
-
-        let path = this.getPathToLeaf(key);
-        let leaf = path[path.length - 1];
-
-        if (this.animate && this.treeDraw) {
-            let steps = path.map(node => ({ highlights: new Set([node]) }));
-            steps.push({ highlights: new Set([leaf]), delay: this.animationSpeed * 2 });
-            await this.treeDraw.animate(steps);
-        }
-
-        // Encontrar e remover a chave
-        let found = false;
-        let removedIndex = -1;
-        for (let i = 0; i < leaf.searchKeys.length; i++) {
-            if (leaf.searchKeys[i] === key) {
-                leaf.searchKeys.splice(i, 1);
-                leaf.pointers.splice(i, 1); // Remover ponteiro correspondente
-                found = true;
-                removedIndex = i;
-                break;
-            }
-        }
-
-        if (!found) {
-            this.treeDraw?.addInfo(`REMOÇÃO: Valor ${key} não encontrado!`, "ERROR");
-            return;
-        }
-        this.treeDraw?.addInfo(`REMOÇÃO: Valor ${key} removido!`, "SUCCESS");
-        // parece correto ate aqui
-
-        // Se a chave removida era a primeira da folha, atualizar separadores nos nós internos
-        if (removedIndex === 0 && leaf.searchKeys.length > 0 && leaf !== this.root) {
-            this._updateSeparator(leaf, leaf.searchKeys[0]);
-        }
-
-        // Se nó folha ficou com menos de minKeys, fazer merge/borrow
-        if (leaf.searchKeys.length < this.minKeys && leaf !== this.root) {
-            this._rebalanceLeaf(leaf);
-        }
-
-        // Se raiz ficou vazia, atualizar raiz
-        if (this.root.searchKeys.length === 0 && this.root.pointers.length > 0) {
-            this.root = this.root.pointers[0];
-        }
-    }
-
-    // Encontra e retorna a folha onde o elemento pode está
-    _findLeaf(key) {
-        let current = this.root;
-
-        while (!current.isLeaf) {
-            let i = 0;
-            for (i = 0; i < current.searchKeys.length; i++) {
-                if (key < current.searchKeys[i]) {
-                    break;
-                }
-            }
-            current = current.pointers[i];
-        }
-
-        return current;
-    }
-
     _findParent(node, child) {
         if (node.isLeaf) return null;
 
@@ -283,89 +340,6 @@ export class BPlusTree {
         }
 
         return null;
-    }
-
-    _rebalanceLeaf(leaf) {
-        let parent = this._findParent(this.root, leaf);
-        if (parent == null) return;
-
-        // Encontrar índice da folha no pai
-        let leafIndex = parent.pointers.indexOf(leaf);
-
-        // Tentar pegar emprestado do irmão direito
-        if (leafIndex < parent.pointers.length - 1) {
-            let rightSibling = parent.pointers[leafIndex + 1];
-            if (rightSibling.searchKeys.length > this.minKeys) {
-                // Mover primeira chave do irmão direito para o final da folha atual
-                leaf.searchKeys.push(rightSibling.searchKeys.shift());
-                leaf.pointers.splice(leaf.pointers.length - 1, 0, rightSibling.pointers.shift());
-
-                // Atualizar chave do pai
-                parent.searchKeys[leafIndex] = rightSibling.searchKeys[0] || leaf.searchKeys[0];
-                return;
-            }
-        }
-
-        // Tentar pegar emprestado do irmão esquerdo
-        if (leafIndex > 0) {
-            let leftSibling = parent.pointers[leafIndex - 1];
-            if (leftSibling.searchKeys.length > this.minKeys) {
-                // Mover última chave do irmão esquerdo para o início da folha atual
-                leaf.searchKeys.unshift(leftSibling.searchKeys.pop());
-                leaf.pointers.unshift(leftSibling.pointers.pop());
-
-                // Atualizar chave do pai
-                parent.searchKeys[leafIndex - 1] = leaf.searchKeys[0];
-                return;
-            }
-        }
-
-        // Fazer merge com irmão
-        if (leafIndex < parent.pointers.length - 1) {
-            let rightSibling = parent.pointers[leafIndex + 1];
-            // Concatenar chaves
-            leaf.searchKeys = leaf.searchKeys.concat(rightSibling.searchKeys);
-            // Concatenar ponteiros removendo o ponteiro intermediário
-            leaf.pointers = leaf.pointers.slice(0, -1).concat(rightSibling.pointers.slice(1));
-
-            // Remover entrada do pai
-            parent.searchKeys.splice(leafIndex, 1);
-            parent.pointers.splice(leafIndex + 1, 1);
-        } else if (leafIndex > 0) {
-            let leftSibling = parent.pointers[leafIndex - 1];
-            // Concatenar chaves
-            leftSibling.searchKeys = leftSibling.searchKeys.concat(leaf.searchKeys);
-            // Concatenar ponteiros removendo o ponteiro intermediário
-            leftSibling.pointers = leftSibling.pointers.slice(0, -1).concat(leaf.pointers.slice(1));
-
-            // Remover entrada do pai
-            parent.searchKeys.splice(leafIndex - 1, 1);
-            parent.pointers.splice(leafIndex, 1);
-        }
-
-        // Se pai ficou desequilibrado
-        if (parent.searchKeys.length < this.minKeys && parent !== this.root) {
-            this._rebalanceLeaf(parent);
-        }
-    }
-
-    _updateSeparator(node, newMin) {
-        let parent = this._findParent(this.root, node);
-        if (!parent) return;
-
-        let index = parent.pointers.indexOf(node);
-        if (index > 0) {
-            parent.searchKeys[index - 1] = newMin;
-            // Se este é o primeiro filho, pode afetar o separador do pai
-            if (index === 1 && parent !== this.root) {
-                this._updateSeparator(parent, newMin);
-            }
-        } else if (index === 0) {
-            // Se é o primeiro filho, o mínimo do pai pode mudar
-            if (parent !== this.root) {
-                this._updateSeparator(parent, newMin);
-            }
-        }
     }
 
 }

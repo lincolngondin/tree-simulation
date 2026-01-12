@@ -21,10 +21,16 @@ t.insert(10)
 t.insert(45)
 t.insert(2)
 t.insert(22)
+t.delete(22)
+t.delete(15)
+t.delete(45)
+t.delete(5)
+/*
 t.insert(1)
 t.insert(43)
 t.insert(90)
 t.insert(24)
+*/
 
 let td = new TreeDraw(t, c, configs);
 t.setTreeDraw(td);
@@ -82,6 +88,7 @@ removeRandom.addEventListener("click", async () => {
         return;
     }
     await t.removeRandom(value);
+    console.log(t)
     updateTree()
 })
 
