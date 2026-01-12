@@ -177,12 +177,14 @@ export class BPlusTree {
         // merge
         if (leftSibling) {
             leftSibling.searchKeys = leftSibling.searchKeys.concat(leaf.searchKeys);
-            leftSibling.pointers = leftSibling.pointers.slice(0, -1).concat(leaf.pointers.slice(1));
+            leftSibling.pointers = leftSibling.pointers.slice(0, leftSibling.searchKeys.length + 1).concat(leaf.pointers.slice(0, leaf.searchKeys.length));
+            leftSibling.pointers[leftSibling.pointers.length - 1] = leaf.pointers[leaf.pointers.length - 1];
             parent.searchKeys.splice(leafIndex - 1, 1);
             parent.pointers.splice(leafIndex, 1);
         } else if (rightSibling) {
             leaf.searchKeys = leaf.searchKeys.concat(rightSibling.searchKeys);
-            leaf.pointers = leaf.pointers.slice(0, -1).concat(rightSibling.pointers.slice(1));
+            leaf.pointers = leaf.pointers.slice(0, leaf.searchKeys.length + 1).concat(rightSibling.pointers.slice(0, rightSibling.searchKeys.length));
+            leaf.pointers[leaf.pointers.length - 1] = rightSibling.pointers[rightSibling.pointers.length - 1];
             parent.searchKeys.splice(leafIndex, 1);
             parent.pointers.splice(leafIndex + 1, 1);
         }
