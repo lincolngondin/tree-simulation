@@ -119,11 +119,17 @@ export class TreeDraw {
         return Math.max(totalWidth, nodeWidth);
     }
 
-    // retorna o comprimento de um no
+    // retorna o comprimento de um no considera o tipo de arvore *
     _getNodeWidth(node) {
         if (node == null) return 0;
-        // Largura = (número de pointers * largura_pointer) + (número de chaves * largura_chave)
-        return node.pointers.length * this.configs.nodePointerWidth + node.searchKeys.length * this.configs.nodeWidth;
+        if (this.tree.type === "bplustree") {
+            // Largura = (número de pointers * largura_pointer) + (número de chaves * largura_chave)
+            return node.pointers.length * this.configs.nodePointerWidth + node.searchKeys.length * this.configs.nodeWidth;
+        }
+        else {
+            // Largura = (número de pointers * largura_pointer) + (número de chaves * largura_chave) + (numeros de ponteiros para registro * largura ponteiros para registro)
+            return node.pointers.length * this.configs.nodePointerWidth + node.searchKeys.length * this.configs.nodeWidth + node.pointerRegisters.length * this.configs.nodePointerRegisterWidth;
+        }
     }
 
     _getSubtreeWidth(node) {
@@ -192,6 +198,14 @@ export class TreeDraw {
             const isHighlighted = this.highlights.has(node);
             this.render.drawRectangle(currentX, pos.y, this.configs.nodePointerWidth, this.configs.nodeHeight, isHighlighted);
             currentX += this.configs.nodePointerWidth;
+
+            if (this.tree.type == "btree" && !node.isLeaf) {
+                // desenha ponteiro para registro se existir
+                if (i < node.pointerRegisters.length) {
+                    this.render.drawRectangleWithText(currentX, pos.y, this.configs.nodePointerRegisterWidth, this.configs.nodeHeight, node.searchKeys[i].toString(), isHighlighted);
+                    currentX += this.configs.nodePointerRegisterWidth;
+                }
+            }
 
             // Desenhar chave (se existir para este índice)
             if (i < node.searchKeys.length) {

@@ -11,20 +11,9 @@ let animate = true
 let animationSpeed = 500
 let actualFanout = 4;
 
-let t = new BPlusTree(actualFanout, animate, animationSpeed)
-// let t = new BTree(3, animate, animationSpeed)
+//let t = new BPlusTree(actualFanout, animate, animationSpeed)
+let t = new BTree(actualFanout, animate, animationSpeed)
 t.insert(15)
-t.insert(55)
-t.insert(5)
-t.insert(25)
-t.insert(10)
-t.insert(45)
-t.insert(2)
-t.insert(22)
-t.delete(22)
-t.delete(15)
-t.delete(45)
-t.delete(5)
 /*
 t.insert(1)
 t.insert(43)
@@ -210,7 +199,8 @@ btnFanout.addEventListener("click", () => {
 
     }
     console.log(`Novo valor do fanout é ${num}`)
-    t = new BPlusTree(num, animate, animationSpeed)
+    //t = new BPlusTree(num, animate, animationSpeed)
+    t = new BTree(num, animate, animationSpeed)
     td = new TreeDraw(t, c, configs);
     t.setTreeDraw(td)
     updateTree()

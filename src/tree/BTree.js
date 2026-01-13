@@ -1,19 +1,29 @@
 class Node {
     constructor() {
         // valores das chaves de pesquisa
-        this.searchKeys = [];
+        this.searchKeys = new Array();
         // Ponteiros para filhos
-        this.pointers = [];
+        this.pointers = new Array();
+        // Ponteiros de registro do bucket em nós não folhas, na pratica serão sempre nulos apenas para preencher
+        this.pointerRegisters = new Array();
         // Se o no atual é uma folha
         this.isLeaf = false;
+        this.isRoot = false;
     }
 }
 
 export class BTree {
     constructor(fanout, animate = false, animationSpeed = 500) {
+        this.type = "btree"
         this.fanout = fanout;
-        this.minKeys = Math.ceil(this.fanout / 2) - 1;
+        // Relativos aos nos folhas
+        this.minKeys = Math.ceil((this.fanout - 1) / 2);
         this.maxKeys = this.fanout - 1;
+
+        // nos não folhas(ou nos internos) devem ter pelo menos ceil(n/2) -1 valores até n-1 valores
+        this.minNonLeafPointersKeys = Math.ceil(this.fanout / 2) - 1;
+        this.maxNonLeafPointersKeys = this.fanout - 1;
+        // Relativos aos nos nao folhas, m vai ser o fanout
         this.root = null;
         this.animate = animate;
         this.animationSpeed = animationSpeed;
@@ -71,20 +81,31 @@ export class BTree {
         }
     }
 
+    async insertRandom(quantity, infValue, supValue) {
+        for (let i = 0; i < quantity; i++) {
+            const newkey = Math.floor(Math.random() * supValue) + infValue;
+            await this.insert(newkey);
+        }
+    }
     // Insere uma chave na árvore
     async insert(key) {
+
+        // Arvore vazia
+        if (this.root == null) {
+            this.root = new Node();
+            this.root.isLeaf = true;
+            this.root.isRoot = true;
+            this.root.searchKeys = [key];
+            this.root.pointers = [null, null];
+            this.root.pointerRegisters = [null];
+            return;
+        }
+
         if (this.animate && this.treeDraw) {
             let path = this.getPathToKey(key);
             let steps = path.map(node => ({ highlights: new Set([node]) }));
             steps.push({ highlights: new Set([path[path.length - 1]]), delay: this.animationSpeed * 2 });
             await this.treeDraw.animate(steps);
-        }
-
-        if (this.root == null) {
-            this.root = new Node();
-            this.root.isLeaf = true;
-            this.root.searchKeys = [key];
-            return;
         }
 
         // Se raiz cheia, dividir antes de inserir
@@ -102,13 +123,16 @@ export class BTree {
     _insertNonFull(node, key) {
         let i = node.searchKeys.length - 1;
 
+        // no folha tem ponteiro e valor apenas
         if (node.isLeaf) {
             // Inserir na folha
             while (i >= 0 && key < node.searchKeys[i]) {
                 i--;
             }
             i++;
+            // adiciona a chave e o ponteiro
             node.searchKeys.splice(i, 0, key);
+            node.pointers.splice(i, 0, null)
         } else {
             // Encontrar filho correto
             while (i >= 0 && key < node.searchKeys[i]) {
@@ -136,17 +160,34 @@ export class BTree {
         let mid = Math.floor(this.maxKeys / 2);
         let promotedKey = y.searchKeys[mid];
 
-        // Mover chaves para o novo nó
-        z.searchKeys = y.searchKeys.splice(mid + 1);
-        y.searchKeys.splice(mid, 1); // Remover chave promovida
+        z.searchKeys = y.searchKeys.slice(mid + 1);
+        // Chaves que permanecem no nó original (esquerda)
+        y.searchKeys = y.searchKeys.slice(0, mid);
 
-        if (!y.isLeaf) {
-            z.pointers = y.pointers.splice(mid + 1);
+        if (y.pointerRegisters.length > 0) {
+            z.pointerRegisters = y.pointerRegisters.slice(mid + 1);
+            y.pointerRegisters = y.pointerRegisters.slice(0, mid);
+        } else {
+            // Garantir alinhamento estrutural
+            z.pointerRegisters = new Array(z.searchKeys.length).fill(null);
+            y.pointerRegisters = new Array(y.searchKeys.length).fill(null);
         }
 
-        // Inserir no pai
+        // divide ponteiros de filhos
+        if (!y.isLeaf) {
+            z.pointers = y.pointers.slice(mid + 1);
+            y.pointers = y.pointers.slice(0, mid + 1);
+        } else {
+            // Folhas também precisam manter k+1 ponteiros
+            z.pointers = new Array(z.searchKeys.length + 1).fill(null);
+            y.pointers = new Array(y.searchKeys.length + 1).fill(null);
+        }
+
+        // Insere no nó pai
         parent.searchKeys.splice(i, 0, promotedKey);
+        parent.pointerRegisters.splice(i, 0, null);
         parent.pointers.splice(i + 1, 0, z);
+
     }
 
     // Remove uma chave da árvore

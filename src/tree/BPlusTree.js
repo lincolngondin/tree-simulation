@@ -13,6 +13,7 @@ class Node {
 
 export class BPlusTree {
     constructor(fanout, animate = false, animationSpeed = 500) {
+        this.type = "bplustree"
         this.fanout = fanout;
         // folhas devem ter pelo menos ceil((n-1)/2) valores ate n-1 valores
         this.minKeys = Math.ceil((this.fanout - 1) / 2)
