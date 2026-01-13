@@ -9,8 +9,7 @@ class Message {
 }
 
 export class TreeDraw {
-    constructor(tree, canvasRender, configs) {
-        this.tree = tree;
+    constructor(canvasRender, configs) {
         this.render = canvasRender;
 
         // Parâmetros configuráveis com valores padrão
@@ -20,7 +19,16 @@ export class TreeDraw {
         this.maxInfos = 5;
     }
 
+    setTree(tree) {
+        // reseta as informaçoes
+        this.infos = new Array();
+        this.tree = tree;
+        this.drawTree();
+    }
+
     drawInfo() {
+        // desenha o titulo com as informacoes da arvore atual
+        this.render.drawText(`Àrvore ${this.tree.type == "bplustree" ? "B+" : "B"} Grau/Fanout: ${this.tree.fanout}`, this.render.width - 300, 20, 20, "Monospace", "black");
         // desenha todas as operacoes executadas na arvore
         for (let i = 0; i < this.infos.length; i++) {
             let messageColor = "blue";
@@ -42,14 +50,17 @@ export class TreeDraw {
     }
 
     drawTree() {
+        // Limpar canvas
+        this.render.clearWindow();
+
+        // Desenha as informaçoes
+        this.drawInfo()
+
         // se não há arvore não desenha
         if (this.tree.root == null) {
             return;
         }
 
-        // Limpar canvas
-        this.render.clearWindow();
-        this.drawInfo()
 
         // Calcular posições dos nós começando do centro superior do canvas
         const positions = new Map();

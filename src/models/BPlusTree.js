@@ -1,15 +1,4 @@
-class Node {
-    constructor() {
-        // valores das chaves de pesquisa
-        this.searchKeys = [];
-        // Ponteiros para filhos
-        this.pointers = [];
-        // Se o no atual é uma folha
-        this.isLeaf = false;
-        // Se o no atual é a raiz
-        this.isRoot = false;
-    }
-}
+import { Node } from "./Node.js";
 
 export class BPlusTree {
     constructor(fanout, animate = false, animationSpeed = 500) {
@@ -62,7 +51,6 @@ export class BPlusTree {
             this.insertInParent(leaf, L_.searchKeys[0], L_);
         }
 
-        this.treeDraw?.addInfo(`INSERÇÃO: Valor ${key} adicionado!`, "SUCCESS");
     }
 
     insertInLeaf(node, key) {
@@ -140,14 +128,11 @@ export class BPlusTree {
             }
         }
         if (!found) {
-            this.treeDraw?.addInfo(`REMOÇÃO: Valor ${key} não encontrado!`, "ERROR");
-            return;
+            return null;
         }
 
         leaf.searchKeys.splice(index, 1);
         leaf.pointers.splice(index, 1);
-
-        this.treeDraw?.addInfo(`REMOÇÃO: Valor ${key} removido!`, "SUCCESS");
 
         if (leaf.searchKeys.length >= this.minKeys || leaf === this.root) return;
 
@@ -289,33 +274,10 @@ export class BPlusTree {
         // No folha equivalente
         for (let i = 0; i < c.searchKeys.length; i++) {
             if (key === c.searchKeys[i]) {
-                this.treeDraw?.addInfo(`BUSCA: Valor ${key} encontrado!`, "SUCCESS");
                 return c.searchKeys[i]
             }
         }
-        this.treeDraw?.addInfo(`BUSCA: Valor ${key} não encontrado!`, "ERROR");
         return null;
-    }
-    async insertRandom(quantity, infValue, supValue) {
-        for (let i = 0; i < quantity; i++) {
-            const newkey = Math.floor(Math.random() * supValue) + infValue;
-            await this.insert(newkey);
-        }
-    }
-    async removeRandom(quantity) {
-        const keys = this.getAllKeys()
-        // randomiza os valores das chaves
-        console.log(keys)
-        for (let i = keys.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [keys[i], keys[j]] = [keys[j], keys[i]];
-        }
-        console.log(keys)
-        // se a quantidade for maior que a quantidade de valores
-        const times = (quantity > keys.length) ? keys.length : quantity;
-        for (let i = 0; i < times; i++) {
-            await this.delete(keys[i]);
-        }
     }
     getAllKeys() {
         if (!this.root) return [];

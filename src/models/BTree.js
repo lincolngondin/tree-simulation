@@ -1,17 +1,4 @@
-class Node {
-    constructor() {
-        // valores das chaves de pesquisa
-        this.searchKeys = new Array();
-        // Ponteiros para filhos
-        this.pointers = new Array();
-        // Ponteiros de registro do bucket em nós não folhas, na pratica serão sempre nulos apenas para preencher
-        this.pointerRegisters = new Array();
-        // Se o no atual é uma folha
-        this.isLeaf = false;
-        this.isRoot = false;
-    }
-}
-
+import { Node } from "./Node.js";
 export class BTree {
     constructor(fanout, animate = false, animationSpeed = 500) {
         this.type = "btree"
@@ -81,12 +68,6 @@ export class BTree {
         }
     }
 
-    async insertRandom(quantity, infValue, supValue) {
-        for (let i = 0; i < quantity; i++) {
-            const newkey = Math.floor(Math.random() * supValue) + infValue;
-            await this.insert(newkey);
-        }
-    }
     // Insere uma chave na árvore
     async insert(key) {
 
@@ -190,151 +171,164 @@ export class BTree {
 
     }
 
-    // Remove uma chave da árvore
     async delete(key) {
-        if (this.animate && this.treeDraw) {
-            let path = this.getPathToKey(key);
-            let steps = path.map(node => ({ highlights: new Set([node]) }));
-            steps.push({ highlights: new Set([path[path.length - 1]]), delay: this.animationSpeed * 2 });
-            await this.treeDraw.animate(steps);
+        if (!this.root) return;
+
+        this._deleteRecursive(this.root, key);
+
+        // Ajuste da raiz
+        if (!this.root.isLeaf && this.root.searchKeys.length === 0) {
+            this.root = this.root.pointers[0];
+            this.root.isRoot = true;
         }
 
-        if (this.root == null) return;
-
-        this._delete(this.root, key);
-
-        // Se raiz ficou vazia, ajustar
-        if (this.root.searchKeys.length === 0) {
-            if (this.root.isLeaf) {
-                this.root = null;
-            } else {
-                this.root = this.root.pointers[0];
-            }
+        if (this.root.searchKeys.length === 0 && this.root.isLeaf) {
+            this.root = null;
         }
     }
 
-    _delete(node, key) {
-        let i = 0;
-        while (i < node.searchKeys.length && key > node.searchKeys[i]) {
-            i++;
+    _deleteRecursive(node, key) {
+        let idx = 0;
+        while (idx < node.searchKeys.length && key > node.searchKeys[idx]) {
+            idx++;
         }
 
-        if (node.isLeaf) {
-            // Remover da folha
-            if (i < node.searchKeys.length && node.searchKeys[i] === key) {
-                node.searchKeys.splice(i, 1);
+        // CASO 1: chave encontrada neste nó
+        if (idx < node.searchKeys.length && node.searchKeys[idx] === key) {
+            if (node.isLeaf) {
+                // Remove direto
+                node.searchKeys.splice(idx, 1);
+                node.pointerRegisters.splice(idx, 1);
+                node.pointers.splice(idx, 1);
+            } else {
+                // Substituir por predecessor
+                let predNode = node.pointers[idx];
+                while (!predNode.isLeaf) {
+                    predNode = predNode.pointers[predNode.pointers.length - 1];
+                }
+                let predKey = predNode.searchKeys[predNode.searchKeys.length - 1];
+                node.searchKeys[idx] = predKey;
+                this._deleteRecursive(node.pointers[idx], predKey);
             }
             return;
         }
 
-        // Se chave está neste nó
-        if (i < node.searchKeys.length && node.searchKeys[i] === key) {
-            return this._deleteInternalNode(node, i);
+        // CASO 2: chave não está aqui
+        if (node.isLeaf) {
+            return; // chave não existe
         }
+        // Antes de descer, garantir tamanho
+        let originalIdx = idx;
 
-        // Chave deve estar no filho
-        let child = node.pointers[i];
-        if (child.searchKeys.length === this.minKeys) {
-            this._fillChild(node, i);
-            // Após preencher, o filho pode ter mudado
-            child = node.pointers[i];
+        // Garantir que o filho tenha chaves suficientes
+        this._fixChildSize(node, idx);
+
+        // Se houve merge com o irmão esquerdo,
+        // o filho correto agora é idx - 1
+        if (originalIdx > node.searchKeys.length) {
+            idx--;
         }
-
-        this._delete(child, key);
+        // Pode ter mudado após fix
+        this._deleteRecursive(node.pointers[idx], key);
     }
 
-    _deleteInternalNode(node, i) {
-        let k = node.searchKeys[i];
+    _fixChildSize(parent, idx) {
+        let child = parent.pointers[idx];
 
-        if (node.pointers[i].searchKeys.length > this.minKeys) {
-            // Substituir por predecessor
-            let pred = this._getPredecessor(node.pointers[i]);
-            node.searchKeys[i] = pred;
-            this._delete(node.pointers[i], pred);
-        } else if (node.pointers[i + 1].searchKeys.length > this.minKeys) {
-            // Substituir por sucessor
-            let succ = this._getSuccessor(node.pointers[i + 1]);
-            node.searchKeys[i] = succ;
-            this._delete(node.pointers[i + 1], succ);
+        if (child.searchKeys.length > this.minKeys) return;
+
+        // Tenta pegar do irmão esquerdo
+        if (idx > 0 && parent.pointers[idx - 1].searchKeys.length > this.minKeys) {
+            this._borrowFromLeft(parent, idx);
+            return;
+        }
+
+        // Tenta pegar do irmão direito
+        if (idx < parent.pointers.length - 1 &&
+            parent.pointers[idx + 1].searchKeys.length > this.minKeys) {
+            this._borrowFromRight(parent, idx);
+            return;
+        }
+
+        // Senão, merge
+        if (idx > 0) {
+            this._merge(parent, idx - 1);
         } else {
-            // Mesclar filhos
-            this._mergeChildren(node, i);
-            this._delete(node.pointers[i], k);
+            this._merge(parent, idx);
         }
     }
 
-    _getPredecessor(node) {
-        while (!node.isLeaf) {
-            node = node.pointers[node.pointers.length - 1];
+    _borrowFromLeft(parent, idx) {
+        let child = parent.pointers[idx];
+        let left = parent.pointers[idx - 1];
+
+        // Move chave do pai para o filho
+        child.searchKeys.unshift(parent.searchKeys[idx - 1]);
+        child.pointerRegisters.unshift(null);
+
+        parent.searchKeys[idx - 1] = left.searchKeys.pop();
+        left.pointerRegisters.pop();
+
+        if (!child.isLeaf) {
+            child.pointers.unshift(left.pointers.pop());
         }
-        return node.searchKeys[node.searchKeys.length - 1];
+        else {
+            child.pointers = new Array(child.searchKeys.length + 1).fill(null);
+        }
     }
 
-    _getSuccessor(node) {
-        while (!node.isLeaf) {
-            node = node.pointers[0];
+    _borrowFromRight(parent, idx) {
+        let child = parent.pointers[idx];
+        let right = parent.pointers[idx + 1];
+
+        child.searchKeys.push(parent.searchKeys[idx]);
+        child.pointerRegisters.push(null);
+
+        parent.searchKeys[idx] = right.searchKeys.shift();
+        right.pointerRegisters.shift();
+
+        if (!child.isLeaf) {
+            child.pointers.push(right.pointers.shift());
         }
-        return node.searchKeys[0];
+        else {
+            child.pointers = new Array(child.searchKeys.length + 1).fill(null);
+        }
     }
 
-    _fillChild(node, i) {
-        if (i > 0 && node.pointers[i - 1].searchKeys.length > this.minKeys) {
-            // Pegar emprestado do irmão esquerdo
-            this._borrowFromLeft(node, i);
-        } else if (i < node.pointers.length - 1 && node.pointers[i + 1].searchKeys.length > this.minKeys) {
-            // Pegar emprestado do irmão direito
-            this._borrowFromRight(node, i);
+    _merge(parent, idx) {
+        let left = parent.pointers[idx];
+        let right = parent.pointers[idx + 1];
+
+        // Chave do pai desce
+        left.searchKeys.push(parent.searchKeys[idx]);
+        left.pointerRegisters.push(null);
+
+        // Junta tudo
+        left.searchKeys = left.searchKeys.concat(right.searchKeys);
+        left.pointerRegisters = left.pointerRegisters.concat(right.pointerRegisters);
+
+        if (!left.isLeaf) {
+            left.pointers = left.pointers.concat(right.pointers);
         } else {
-            // Mesclar
-            if (i > 0) {
-                this._mergeChildren(node, i - 1);
-            } else {
-                this._mergeChildren(node, i);
-            }
+            left.pointers = new Array(left.searchKeys.length + 1).fill(null);
         }
+
+        parent.searchKeys.splice(idx, 1);
+        parent.pointerRegisters.splice(idx, 1);
+        parent.pointers.splice(idx + 1, 1);
     }
 
-    _borrowFromLeft(node, i) {
-        let child = node.pointers[i];
-        let sibling = node.pointers[i - 1];
-
-        // Mover chave do pai para o filho
-        child.searchKeys.unshift(node.searchKeys[i - 1]);
-        node.searchKeys[i - 1] = sibling.searchKeys.pop();
-
-        if (!child.isLeaf) {
-            child.pointers.unshift(sibling.pointers.pop());
+    getAllKeys() {
+        if (!this.root) return [];
+        let current = this.root;
+        while (!current.isLeaf) {
+            current = current.pointers[0];
         }
-    }
-
-    _borrowFromRight(node, i) {
-        let child = node.pointers[i];
-        let sibling = node.pointers[i + 1];
-
-        // Mover chave do pai para o filho
-        child.searchKeys.push(node.searchKeys[i]);
-        node.searchKeys[i] = sibling.searchKeys.shift();
-
-        if (!child.isLeaf) {
-            child.pointers.push(sibling.pointers.shift());
+        let allKeys = [];
+        while (current) {
+            allKeys = allKeys.concat(current.searchKeys);
+            current = current.pointers[current.pointers.length - 1];
         }
-    }
-
-    _mergeChildren(node, i) {
-        let child = node.pointers[i];
-        let sibling = node.pointers[i + 1];
-
-        // Mover chave do pai para o filho
-        child.searchKeys.push(node.searchKeys[i]);
-        node.searchKeys.splice(i, 1);
-
-        // Concatenar chaves e ponteiros do irmão
-        child.searchKeys = child.searchKeys.concat(sibling.searchKeys);
-        if (!child.isLeaf) {
-            child.pointers = child.pointers.concat(sibling.pointers);
-        }
-
-        // Remover ponteiro do irmão
-        node.pointers.splice(i + 1, 1);
+        return allKeys;
     }
 }

@@ -125,6 +125,8 @@ export class CanvasRenderer {
 
     drawText(text, x, y, size, fontFamily, color) {
         this.ctx.fillStyle = color;
+        this.ctx.textAlign = "center";
+        this.ctx.textBaseline = "middle";
         this.ctx.font = `${size}px ${fontFamily}`;
         const textMetrics = this.ctx.measureText(text)
         this.ctx.fillText(text, x + (textMetrics.width / 2), y);
