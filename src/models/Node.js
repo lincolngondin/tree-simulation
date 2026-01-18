@@ -9,5 +9,6 @@ export class Node {
         // Se o no atual é uma folha
         this.isLeaf = false;
         this.isRoot = false;
+        this.id = Math.floor(Math.random() * 1000000000);
     }
 }

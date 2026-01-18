@@ -1,6 +1,7 @@
 import { Node } from "./Node.js";
-export class BTree {
-    constructor(fanout, animate = false, animationSpeed = 500) {
+
+export default class BTree {
+    constructor(fanout) {
         this.type = "btree"
         this.fanout = fanout;
         // Relativos aos nos folhas
@@ -12,49 +13,31 @@ export class BTree {
         this.maxNonLeafPointersKeys = this.fanout - 1;
         // Relativos aos nos nao folhas, m vai ser o fanout
         this.root = null;
-        this.animate = animate;
-        this.animationSpeed = animationSpeed;
-        this.treeDraw = null;
+        this.listeners = new Array();
     }
 
-    setTreeDraw(treeDraw) {
-        this.treeDraw = treeDraw;
+    // cadastrar listeners para ouvir os eventos emitidos
+    onEvent(listener) {
+        this.listeners.push(listener);
     }
-
-    // Retorna o caminho até o nó onde a chave está ou deveria estar
-    getPathToKey(key) {
-        let path = [];
-        let current = this.root;
-        path.push(current);
-        while (!current.isLeaf) {
-            let i = 0;
-            for (i = 0; i < current.searchKeys.length; i++) {
-                if (key <= current.searchKeys[i]) {
-                    break;
-                }
-            }
-            current = current.pointers[i];
-            path.push(current);
-        }
-        return path;
+    // emite eventos que serão usados pelos view
+    emit(event) {
+        this.listeners.forEach(l => l(event))
     }
 
     // Busca uma chave na árvore
     async find(key) {
-        if (this.animate && this.treeDraw) {
-            let path = this.getPathToKey(key);
-            let steps = path.map(node => ({ highlights: new Set([node]) }));
-            steps.push({ highlights: new Set([path[path.length - 1]]), delay: this.animationSpeed * 2 });
-            await this.treeDraw.animate(steps);
-        }
-
         if (this.root == null) return null;
+        this.emit({ type: "search:start", key: key });
 
         let current = this.root;
+        this.emit({ type: "search:visit_node", nodeId: current.id });
         while (true) {
             let i = 0;
             for (i = 0; i < current.searchKeys.length; i++) {
+                this.emit({ type: "search:visit_key", nodeId: current.id, pos: i });
                 if (key === current.searchKeys[i]) {
+                    this.emit({ type: "search:end", nodeId: current.id, key: key, success: true });
                     return current.searchKeys[i];
                 }
                 if (key < current.searchKeys[i]) {
@@ -62,15 +45,17 @@ export class BTree {
                 }
             }
             if (current.isLeaf) {
+                this.emit({ type: "search:end", nodeId: current.id, key: key, success: false });
                 return null;
             }
             current = current.pointers[i];
+            this.emit({ type: "search:visit_node", nodeId: current.id });
         }
     }
 
     // Insere uma chave na árvore
     async insert(key) {
-
+        this.emit({ type: "insert:start", key: key })
         // Arvore vazia
         if (this.root == null) {
             this.root = new Node();
@@ -80,13 +65,6 @@ export class BTree {
             this.root.pointers = [null, null];
             this.root.pointerRegisters = [null];
             return;
-        }
-
-        if (this.animate && this.treeDraw) {
-            let path = this.getPathToKey(key);
-            let steps = path.map(node => ({ highlights: new Set([node]) }));
-            steps.push({ highlights: new Set([path[path.length - 1]]), delay: this.animationSpeed * 2 });
-            await this.treeDraw.animate(steps);
         }
 
         // Se raiz cheia, dividir antes de inserir
@@ -99,6 +77,7 @@ export class BTree {
         }
 
         this._insertNonFull(this.root, key);
+        this.emit({ type: "insert:end", key: key })
     }
 
     _insertNonFull(node, key) {
@@ -114,6 +93,7 @@ export class BTree {
             // adiciona a chave e o ponteiro
             node.searchKeys.splice(i, 0, key);
             node.pointers.splice(i, 0, null)
+            this.emit({ type: "leaf:insert_key", nodeId: node.id, key: key, pos: i });
         } else {
             // Encontrar filho correto
             while (i >= 0 && key < node.searchKeys[i]) {
@@ -172,6 +152,7 @@ export class BTree {
     }
 
     async delete(key) {
+        this.emit({ type: "remove:start", key: key });
         if (!this.root) return;
 
         this._deleteRecursive(this.root, key);
@@ -210,11 +191,13 @@ export class BTree {
                 node.searchKeys[idx] = predKey;
                 this._deleteRecursive(node.pointers[idx], predKey);
             }
+            this.emit({ type: "remove:end", key: key, success: true });
             return;
         }
 
         // CASO 2: chave não está aqui
         if (node.isLeaf) {
+            this.emit({ type: "remove:end", key: key, success: false });
             return; // chave não existe
         }
         // Antes de descer, garantir tamanho
@@ -319,16 +302,23 @@ export class BTree {
     }
 
     getAllKeys() {
-        if (!this.root) return [];
-        let current = this.root;
-        while (!current.isLeaf) {
-            current = current.pointers[0];
+        const result = [];
+        function traverse(node) {
+            if (!node) return;
+
+            for (let i = 0; i < node.searchKeys.length; i++) {
+                if (!node.isLeaf) {
+                    traverse(node.pointers[i]);
+                }
+                result.push(node.searchKeys[i]);
+            }
+
+            if (!node.isLeaf) {
+                traverse(node.pointers[node.searchKeys.length]);
+            }
         }
-        let allKeys = [];
-        while (current) {
-            allKeys = allKeys.concat(current.searchKeys);
-            current = current.pointers[current.pointers.length - 1];
-        }
-        return allKeys;
+        traverse(this.root);
+        return result;
     }
+
 }

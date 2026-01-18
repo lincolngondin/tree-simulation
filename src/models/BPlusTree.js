@@ -1,7 +1,7 @@
 import { Node } from "./Node.js";
 
-export class BPlusTree {
-    constructor(fanout, animate = false, animationSpeed = 500) {
+export default class BPlusTree {
+    constructor(fanout) {
         this.type = "bplustree"
         this.fanout = fanout;
         // folhas devem ter pelo menos ceil((n-1)/2) valores ate n-1 valores
@@ -12,14 +12,21 @@ export class BPlusTree {
         this.minNonLeafPointersKeys = Math.ceil(this.fanout / 2) - 1;
         this.maxNonLeafPointersKeys = this.fanout - 1;
 
-        this.animationSpeed = 500; // Velocidade da animação em ms
         this.root = null;
-        this.animate = animate;
-        this.animationSpeed = animationSpeed;
-        this.treeDraw = null;
+        this.listeners = new Array();
+    }
+
+    // cadastrar listeners para ouvir os eventos emitidos
+    onEvent(listener) {
+        this.listeners.push(listener);
+    }
+    // emite eventos que serão usados pelos view
+    emit(event) {
+        this.listeners.forEach(l => l(event))
     }
 
     async insert(key) {
+        this.emit({ type: "insert:start", key: key })
         // Criar raiz se não existir
         if (this.root == null) {
             this.root = new Node();
@@ -33,12 +40,6 @@ export class BPlusTree {
         const path = this.getPathToLeaf(key);
         const leaf = path[path.length - 1]
 
-        if (this.animate && this.treeDraw) {
-            let steps = path.map(node => ({ highlights: new Set([node]) }));
-            steps.push({ highlights: new Set([leaf]), delay: this.animationSpeed * 2 });
-            await this.treeDraw.animate(steps);
-        }
-
         this.insertInLeaf(leaf, key);
 
         if (leaf.searchKeys.length > this.maxKeys) {
@@ -50,6 +51,7 @@ export class BPlusTree {
             leaf.pointers.push(L_);
             this.insertInParent(leaf, L_.searchKeys[0], L_);
         }
+        this.emit({ type: "insert:end", key: key })
 
     }
 
@@ -64,6 +66,7 @@ export class BPlusTree {
         }
         node.searchKeys.splice(pos, 0, key);
         node.pointers.splice(pos, 0, null);
+        this.emit({ type: "leaf:insert_key", nodeId: node.id, key: key, pos: pos });
     }
 
     insertInParent(node, keyLine, nodeLine) {
@@ -79,7 +82,6 @@ export class BPlusTree {
         let parent = this._findParent(this.root, node);
 
         if (parent == null) {
-            // shouldn't happen
             return;
         }
 
@@ -107,16 +109,11 @@ export class BPlusTree {
         }
     }
     async delete(key) {
+        this.emit({ type: "remove:start", key: key });
         if (!this.root) return;
 
         let path = this.getPathToLeaf(key);
         let leaf = path[path.length - 1];
-
-        if (this.animate && this.treeDraw) {
-            let steps = path.map(node => ({ highlights: new Set([node]) }));
-            steps.push({ highlights: new Set([leaf]), delay: this.animationSpeed * 2 });
-            await this.treeDraw.animate(steps);
-        }
 
         let found = false;
         let index = -1;
@@ -128,17 +125,25 @@ export class BPlusTree {
             }
         }
         if (!found) {
+            this.emit({ type: "remove:end", key: key, success: false });
             return null;
         }
 
         leaf.searchKeys.splice(index, 1);
         leaf.pointers.splice(index, 1);
 
-        if (leaf.searchKeys.length >= this.minKeys || leaf === this.root) return;
+        if (leaf.searchKeys.length >= this.minKeys || leaf === this.root) {
+            this.emit({ type: "leaf:remove_key", nodeId: leaf.id, key: key, pos: index + 1 });
+            this.emit({ type: "remove:end", key: key, success: true });
+            return;
+        }
 
         // rebalance leaf
         let parent = path.length > 1 ? path[path.length - 2] : null;
-        if (!parent) return;
+        if (!parent) {
+            this.emit({ type: "remove:end", key: key, success: true });
+            return;
+        }
 
         let leafIndex = parent.pointers.indexOf(leaf);
         let leftSibling = leafIndex > 0 ? parent.pointers[leafIndex - 1] : null;
@@ -149,6 +154,7 @@ export class BPlusTree {
             leaf.searchKeys.unshift(leftSibling.searchKeys.pop());
             leaf.pointers.unshift(leftSibling.pointers.pop());
             parent.searchKeys[leafIndex - 1] = leaf.searchKeys[0];
+            this.emit({ type: "remove:end", key: key, success: true });
             return;
         }
 
@@ -157,6 +163,7 @@ export class BPlusTree {
             leaf.searchKeys.push(rightSibling.searchKeys.shift());
             leaf.pointers.splice(leaf.pointers.length - 1, 0, rightSibling.pointers.shift());
             parent.searchKeys[leafIndex] = rightSibling.searchKeys[0] || leaf.searchKeys[0];
+            this.emit({ type: "remove:end", key: key, success: true });
             return;
         }
 
@@ -184,6 +191,7 @@ export class BPlusTree {
         if (this.root.searchKeys.length === 0 && this.root.pointers.length > 0) {
             this.root = this.root.pointers[0];
         }
+        this.emit({ type: "remove:end", key: key, success: true });
     }
 
     delete_entry(node) {
@@ -228,55 +236,55 @@ export class BPlusTree {
             this.delete_entry(parent);
         }
     }
-    setTreeDraw(treeDraw) {
-        this.treeDraw = treeDraw;
-    }
 
     // Retorna o caminho até a folha onde a chave deve estar
     getPathToLeaf(key) {
         if (!this.root) return [];
         let path = [];
         let c = this.root;
+        this.emit({ type: "search:visit_node", nodeId: c.id });
         path.push(c);
         while (!c.isLeaf) {
             let i = 0;
             for (i = 0; i < c.searchKeys.length; i++) {
+                this.emit({ type: "search:visit_key", nodeId: c.id, pos: i });
                 if (key < c.searchKeys[i]) {
                     break;
                 }
             }
             c = c.pointers[i];
+            this.emit({ type: "search:visit_node", nodeId: c.id });
             path.push(c);
         }
         return path;
     }
     // retorna nulo se não encontrar, se encontrar retorna o no inteiro onde ele está, o no obrigatoriamente tem que ser folha
     async find(key) {
-        if (this.animate && this.treeDraw) {
-            let path = this.getPathToLeaf(key);
-            let steps = path.map(node => ({ highlights: new Set([node]) }));
-            // Adicionar um passo final com destaque mais longo na folha
-            steps.push({ highlights: new Set([path[path.length - 1]]), delay: this.animationSpeed * 2 });
-            await this.treeDraw.animate(steps);
-        }
+        this.emit({ type: "search:start", key: key });
 
         let c = this.root;
+        this.emit({ type: "search:visit_node", nodeId: c.id });
         // Enquanto o no atual não for um no folha
         while (!c.isLeaf) {
             let i = 0;
             for (i = 0; i < c.searchKeys.length; i++) {
+                this.emit({ type: "search:visit_key", nodeId: c.id, pos: i });
                 if (key < c.searchKeys[i]) {
                     break;
                 }
             }
             c = c.pointers[i];
+            this.emit({ type: "search:visit_node", nodeId: c.id });
         }
         // No folha equivalente
         for (let i = 0; i < c.searchKeys.length; i++) {
+            this.emit({ type: "search:visit_key", nodeId: c.id, pos: i });
             if (key === c.searchKeys[i]) {
+                this.emit({ type: "search:end", nodeId: c.id, key: key, success: true });
                 return c.searchKeys[i]
             }
         }
+        this.emit({ type: "search:end", nodeId: c.id, key: key, success: false });
         return null;
     }
     getAllKeys() {

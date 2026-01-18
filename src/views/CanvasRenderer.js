@@ -1,4 +1,5 @@
-export class CanvasRenderer {
+// O CanvasRenderer cuida das funcoes basicas para desenhar no canvas
+export default class CanvasRenderer {
     constructor(idElement) {
         const canvas = document.getElementById(idElement);
 
@@ -37,11 +38,12 @@ export class CanvasRenderer {
         this.cssWidth = cssWidth;
         this.cssHeight = cssHeight;
     }
+    // Limpa a tela do canvas
     clearWindow() {
-        // Limpar usando as dimensões CSS (não as internas com DPR)
         this.ctx.fillStyle = "white";
         this.ctx.fillRect(0, 0, this.cssWidth, this.cssHeight);
     }
+    // Desenha um retangulo preenchido
     drawRectangle(x, y, width, height, highlighted = false) {
         // Desenhar retângulo preenchido
         this.ctx.fillStyle = highlighted ? "#ffeb3b" : "#c8ebfb";
@@ -52,7 +54,14 @@ export class CanvasRenderer {
         this.ctx.lineWidth = 1;
         this.ctx.strokeRect(x, y, width, height);
     }
-    drawRectangleWithText(x, y, width, height, text, highlighted = false) {
+    // Desenha um retangulo
+    drawStrokeRectangle(x, y, width, height, lineWidth, color) {
+        this.ctx.strokeStyle = color;
+        this.ctx.lineWidth = lineWidth;
+        this.ctx.strokeRect(x, y, width, height);
+    }
+    // Desenha um retangulo com texto dentro
+    drawRectangleWithText(x, y, width, height, text, highlighted = false, color) {
         // Definir fonte com tamanho apropriado baseado na altura
         const fontSize = Math.min(height * 0.6, width * 0.3);
         this.ctx.font = `bold ${Math.floor(fontSize)}px Arial`;
@@ -68,11 +77,14 @@ export class CanvasRenderer {
 
         // Desenhar retângulo de fundo
         this.ctx.fillStyle = highlighted ? "#ffeb3b" : "#c8ebfb";
+        if (color) {
+            this.ctx.fillStyle = color;
+        }
         this.ctx.fillRect(x, y, width, height);
 
         // Desenhar borda
         this.ctx.strokeStyle = "black";
-        this.ctx.lineWidth = 1; // Linha mais fina para nitidez
+        this.ctx.lineWidth = 1;
         this.ctx.strokeRect(x, y, width, height);
 
         // Configurar texto
@@ -83,7 +95,7 @@ export class CanvasRenderer {
         // Desenhar texto centralizado
         this.ctx.fillText(text, x + width / 2, y + height / 2);
     }
-
+    // Desenha uma linha de um ponto a outro o parametro directed é usado para decidir se deve ser desenhada um seta na ponta
     drawLine(xa, ya, xb, yb, strokeWidth = 2, strokeColor = "black", directed = false) {
         // Salvar estado do contexto
         this.ctx.save();
@@ -123,6 +135,7 @@ export class CanvasRenderer {
         this.ctx.restore();
     }
 
+    // Desenha text na tela do canvas
     drawText(text, x, y, size, fontFamily, color) {
         this.ctx.fillStyle = color;
         this.ctx.textAlign = "center";
@@ -131,31 +144,4 @@ export class CanvasRenderer {
         const textMetrics = this.ctx.measureText(text)
         this.ctx.fillText(text, x + (textMetrics.width / 2), y);
     }
-
-    // Método para redimensionar o canvas
-    resize(newWidth, newHeight) {
-        const canvas = this.ctx.canvas;
-        const dpr = window.devicePixelRatio || 1;
-
-        // Atualizar dimensões CSS
-        canvas.style.width = newWidth + 'px';
-        canvas.style.height = newHeight + 'px';
-
-        // Atualizar dimensões internas
-        this.cssWidth = newWidth;
-        this.cssHeight = newHeight;
-        this.width = newWidth * dpr;
-        this.height = newHeight * dpr;
-
-        canvas.width = this.width;
-        canvas.height = this.height;
-
-        // Reaplicar escala
-        this.ctx.scale(dpr, dpr);
-
-        // Reaplicar configurações
-        this.ctx.imageSmoothingEnabled = false;
-        this.ctx.textBaseline = "top";
-    }
-
 }

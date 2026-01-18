@@ -1,4 +1,4 @@
-export class VisualizationConfigs {
+export default class VisualizationConfigs {
     constructor() {
         this.nodeWidth = 50;           // Largura de cada chave
         this.nodePointerWidth = 30; // Largura de cada ponteiro
@@ -8,6 +8,5 @@ export class VisualizationConfigs {
         this.verticalSpacing = 120;     // Espaçamento vertical entre níveis
         this.canvasPadding = 50;   // Padding das bordas do canvas
         this.minNodeSpacing = 20; // Espaçamento mínimo entre nós
-        this.animationSpeed = 500; // Velocidade da animação em ms
     }
 }
