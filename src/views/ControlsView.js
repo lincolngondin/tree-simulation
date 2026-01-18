@@ -9,6 +9,7 @@ export default class ControlsView {
         this.btnRemover = document.getElementById("remover");
         this.btnBuscar = document.getElementById("buscar");
         this.btnMudarArvore = document.getElementById("mudarArvore");
+        this.btnLimparArvore = document.getElementById("limparArvore");
 
         // Elementos da seção configurações
         this.fanoutValue = document.getElementById("fanoutValue");
@@ -164,6 +165,7 @@ export default class ControlsView {
                 return;
             }
             console.log(`Novo valor do fanout é ${num} `);
+            this.fanoutValue.value = "";
             this.controller.changeFanout(num);
         })
 
@@ -171,6 +173,11 @@ export default class ControlsView {
         this.btnMudarArvore.addEventListener("click", () => {
             const newType = this.controller.changeTreeType();
             mudarArvore.textContent = "Mudar para árvore " + ((newType == "bplustree") ? "B" : "B+");
+        })
+
+        // Limpar arvore
+        this.btnLimparArvore.addEventListener("click", () => {
+            this.controller.clearTree();
         })
 
         // Mudar a velocidade da animacao

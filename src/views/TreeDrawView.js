@@ -7,16 +7,23 @@ export default class TreeDrawView {
         this.configs = configs;
         // Armazena as informações de status na tela
         this.infos = new Array();
+        this.metricsInfos = new Array();
         // Qantidade maxima que pode ser exibida em um dado momento
         this.maxInfos = 7;
+        this.maxMetricsInfos = 3;
         this.visualState = new VisualState();
         this.animationSpeed = 500;
+        // Métricas
+        this.rwsteps = 0;
+        this.lastInsertionTime = 0;
+        this.lastDeletionTime = 0;
     }
 
     // Muda a arvore atual
     setTree(tree) {
         // reseta as informaçoes
         this.infos = new Array();
+        this.metricsInfos = new Array();
         this.visualState.reset();
         this.tree = tree;
         this.renderFrame();
@@ -49,6 +56,11 @@ export default class TreeDrawView {
 
             this.render.drawText(this.infos[i].message, 10, 20 + i * 20, 16, "Monospace", messageColor)
         }
+        // desenha as metricas relativas a ultima operação de inserção ou deleção em lote
+        for (let i = 0; i < this.metricsInfos.length; i++) {
+            let messageColor = "blue";
+            this.render.drawText(this.metricsInfos[i], this.render.width - 310, 50 + i * 20, 16, "Monospace", messageColor)
+        }
     }
 
     // Adiciona uma mensagem de estado
@@ -57,6 +69,13 @@ export default class TreeDrawView {
             this.infos.shift();
         }
         this.infos.push(new Message(message, kind))
+    }
+    // Adiciona uma mensagem de estado
+    addMetricInfo(message) {
+        if (this.metricsInfos.length >= this.maxMetricsInfos) {
+            this.metricsInfos.shift();
+        }
+        this.metricsInfos.push(message)
     }
 
     // Desenha toda a estrutura da arvore
@@ -186,7 +205,7 @@ export default class TreeDrawView {
         if (!pos) return;
 
         // Calcular largura total do nó para centralizar
-        const totalWidth = node.pointers.length * this.configs.nodePointerWidth + node.searchKeys.length * this.configs.nodeWidth;
+        const totalWidth = this._getNodeWidth(node);
         const startX = pos.x; // pos.x já está centralizado pela _calculatePositions
 
         let currentX = startX;
@@ -206,7 +225,7 @@ export default class TreeDrawView {
             if (this.tree.type == "btree" && !node.isLeaf) {
                 // desenha ponteiro para registro se existir
                 if (i < node.pointerRegisters.length) {
-                    this.render.drawRectangleWithText(currentX, pos.y, this.configs.nodePointerRegisterWidth, this.configs.nodeHeight, node.searchKeys[i].toString(), false);
+                    this.render.drawRectangleWithText(currentX, pos.y, this.configs.nodePointerRegisterWidth, this.configs.nodeHeight, "*", false);
                     currentX += this.configs.nodePointerRegisterWidth;
                 }
             }
@@ -219,7 +238,6 @@ export default class TreeDrawView {
                 }
                 else {
                     this.render.drawRectangleWithText(currentX, pos.y, this.configs.nodeWidth, this.configs.nodeHeight, node.searchKeys[i].toString(), false);
-
                 }
 
                 // Marca a chave que esta sendo visitada em dado momento
@@ -230,9 +248,6 @@ export default class TreeDrawView {
                 }
                 currentX += this.configs.nodeWidth;
             }
-
-
-
         }
 
         // Recursivamente desenha os filhos
@@ -259,7 +274,6 @@ export default class TreeDrawView {
                 }
             }
             for (const e of eventos) {
-                console.log(e)
                 switch (e.type) {
                     case "insert:start":
                         this.addInfo(`INSERÇÃO: Inserindo valor ${e.key}`, "INFO")
@@ -271,6 +285,10 @@ export default class TreeDrawView {
                         this.addInfo(`INSERÇÃO: Inserido ${e.key} com sucesso!`, "SUCCESS")
                         this.visualState.reset();
                         break;
+                    case "search:visit_node":
+                        this.rwsteps++;
+                        this.renderFrame();
+                        continue;
                     default:
                         this.renderFrame();
                         continue;
@@ -283,7 +301,6 @@ export default class TreeDrawView {
         // BUSCA
         else if (eventos[0].type == "search:start") {
             for (const e of eventos) {
-                console.log(e);
                 switch (e.type) {
                     case "search:start":
                         this.visualState.reset();
@@ -326,7 +343,6 @@ export default class TreeDrawView {
             }
 
             for (const e of eventos) {
-                console.log(e);
                 switch (e.type) {
                     case "remove:start":
                         this.addInfo(`REMOÇÃO: Removendo valor ${e.key}...`, "INFO")
@@ -340,6 +356,10 @@ export default class TreeDrawView {
                         }
                         this.visualState.reset();
                         break;
+                    case "search:visit_node":
+                        this.rwsteps++;
+                        this.renderFrame();
+                        continue;
                     case "leaf:remove_key":
                         this.visualState.hiddenKeys.delete(e.nodeId, e.pos);
                         break;

@@ -1,5 +1,6 @@
 import { Node } from "./Node.js";
 
+// Estrutura arvore B+Tree
 export default class BPlusTree {
     constructor(fanout) {
         this.type = "bplustree"

@@ -1,3 +1,4 @@
+// Representa um no em uma arvore B e B+
 export class Node {
     constructor() {
         // valores das chaves de pesquisa

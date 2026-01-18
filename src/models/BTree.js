@@ -1,5 +1,6 @@
 import { Node } from "./Node.js";
 
+// Estrutura arvore B+Tree
 export default class BTree {
     constructor(fanout) {
         this.type = "btree"
@@ -62,6 +63,7 @@ export default class BTree {
             this.root.pointerRegisters = [null];
             return;
         }
+        this.emit({ type: "search:visit_node", nodeId: this.root.id });
 
         // Se raiz cheia, dividir antes de inserir
         if (this.root.searchKeys.length === this.maxKeys) {
@@ -78,6 +80,7 @@ export default class BTree {
 
     _insertNonFull(node, key) {
         let i = node.searchKeys.length - 1;
+        this.emit({ type: "search:visit_node", nodeId: node.id });
 
         // no folha tem ponteiro e valor apenas
         if (node.isLeaf) {
@@ -165,6 +168,7 @@ export default class BTree {
     }
 
     _deleteRecursive(node, key) {
+        this.emit({ type: "search:visit_node", nodeId: node.id });
         let idx = 0;
         while (idx < node.searchKeys.length && key > node.searchKeys[idx]) {
             idx++;

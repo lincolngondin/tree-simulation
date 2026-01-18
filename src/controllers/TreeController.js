@@ -8,13 +8,6 @@ export default class TreeController {
         this.actualFanout = 4;
         this.actualTreeType = "bplustree";
         this.tree = new BPlusTree(this.actualFanout);
-        this.tree.insert(12);
-        this.tree.insert(7);
-        this.tree.insert(22);
-        this.tree.insert(14);
-        this.tree.insert(1);
-        this.tree.insert(8);
-        this.tree.insert(2);
         this.view = view;
         this.view.setTree(this.tree);
         // animator recebe os eventos e chama o animate do view
@@ -28,6 +21,9 @@ export default class TreeController {
     changeTreeType() {
         let newTree;
         if (this.actualTreeType == "bplustree") {
+            if (this.actualFanout == 3) {
+                this.actualFanout = 4;
+            }
             newTree = new BTree(this.actualFanout);
             this.actualTreeType = "btree";
         }
@@ -46,12 +42,20 @@ export default class TreeController {
     }
     // Chama o insert no model e inicia a animacao
     async insert(key) {
+        const inicio = performance.now();
         await this.tree.insert(key);
+        const final = performance.now();
+        const tempo = final - inicio;
+        this.view.lastInsertionTime += tempo;
         await this.animator.start();
     }
     // Chama o delete no model e inicia a animacao
     async delete(key) {
+        const inicio = performance.now();
         await this.tree.delete(key);
+        const final = performance.now();
+        const tempo = final - inicio;
+        this.view.lastDeletionTime += tempo;
         await this.animator.start();
     }
     // Chama o find no model e inicia a animacao
@@ -68,19 +72,31 @@ export default class TreeController {
             const j = Math.floor(Math.random() * (i + 1));
             [keys[i], keys[j]] = [keys[j], keys[i]];
         }
+        this.view.lastDeletionTime = 0;
+        this.view.rwsteps = 0;
         // se a quantidade for maior que a quantidade de valores
         const times = (quantity > keys.length) ? keys.length : quantity;
         for (let i = 0; i < times; i++) {
             await this.delete(keys[i]);
         }
+        this.view.addMetricInfo(`Deleção de ${quantity} elementos:`)
+        this.view.addMetricInfo(` - ${this.view.lastDeletionTime.toFixed(2)}ms`)
+        this.view.addMetricInfo(` - ${this.view.rwsteps} nós`)
+        this.view.renderFrame();
     }
 
     // Insert valores aleatorios na arvore baseado nos parametros passados pelo usuario
     async insertRandom(quantity, infValue, supValue) {
+        this.view.lastInsertionTime = 0;
+        this.view.rwsteps = 0;
         for (let i = 0; i < quantity; i++) {
             const newkey = Math.floor(Math.random() * supValue) + infValue;
             await this.insert(newkey);
         }
+        this.view.addMetricInfo(`Inserção de ${quantity} elementos:`)
+        this.view.addMetricInfo(` - ${this.view.lastInsertionTime.toFixed(2)}ms`)
+        this.view.addMetricInfo(` - ${this.view.rwsteps} nós`)
+        this.view.renderFrame();
     }
 
     // Muda o grau, o fanout da arvore
@@ -100,6 +116,11 @@ export default class TreeController {
             this.animator.enqueue(event);
         })
         this.view.renderFrame();
+    }
+
+    // Apaga a arvore
+    clearTree() {
+        this.changeFanout(this.actualFanout);
     }
 
     // Atualiza a velocidade de animação no view
