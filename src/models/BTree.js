@@ -7,10 +7,6 @@ export default class BTree {
         // Relativos aos nos folhas
         this.minKeys = Math.ceil((this.fanout - 1) / 2);
         this.maxKeys = this.fanout - 1;
-
-        // nos não folhas(ou nos internos) devem ter pelo menos ceil(n/2) -1 valores até n-1 valores
-        this.minNonLeafPointersKeys = Math.ceil(this.fanout / 2) - 1;
-        this.maxNonLeafPointersKeys = this.fanout - 1;
         // Relativos aos nos nao folhas, m vai ser o fanout
         this.root = null;
         this.listeners = new Array();

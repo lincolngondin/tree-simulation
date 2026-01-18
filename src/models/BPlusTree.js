@@ -135,6 +135,8 @@ export default class BPlusTree {
         if (leaf.searchKeys.length >= this.minKeys || leaf === this.root) {
             this.emit({ type: "leaf:remove_key", nodeId: leaf.id, key: key, pos: index + 1 });
             this.emit({ type: "remove:end", key: key, success: true });
+            // caso em que a arvore fica vazia
+            if (this.root && leaf.searchKeys.length == 0) this.root = null;
             return;
         }
 
